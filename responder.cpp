@@ -7,6 +7,10 @@ const uint8_t PIN_RST = 27; // reset pin
 const uint8_t PIN_IRQ = 34; // irq pin
 const uint8_t PIN_SS = 4; // spi select pin
 
+// -- Custom Code --
+const uint8_t DEVICE_ID = 69;
+// -- End --
+
 /* Default communication configuration. We use default non-STS DW mode. */
 static dwt_config_t config = {
         5,               /* Channel number. */
@@ -30,13 +34,22 @@ static dwt_config_t config = {
 
 /* Frames used in the ranging process. See NOTE 3 below. */
 static uint8_t rx_poll_msg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0xE0, 0, 0};
-static uint8_t tx_resp_msg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'V', 'E', 'W', 'A', 0xE1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+
+// -- Custom Code --
+// Added: 1 Byte
+static uint8_t tx_resp_msg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'V', 'E', 'W', 'A', 0xE1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+// -- End --
 /* Length of the common part of the message (up to and including the function code, see NOTE 3 below). */
 #define ALL_MSG_COMMON_LEN 10
 /* Index to access some of the fields in the frames involved in the process. */
 #define ALL_MSG_SN_IDX 2
 #define RESP_MSG_POLL_RX_TS_IDX 10
 #define RESP_MSG_RESP_TX_TS_IDX 14
+
+// -- Custom Code --
+#define RESP_MSG_RESP_ID_IDX 18
+// -- End --
+
 #define RESP_MSG_TS_LEN 4
 /* Frame sequence number, incremented after each transmission. */
 static uint8_t frame_seq_nb = 0;
@@ -69,6 +82,10 @@ static uint64_t resp_tx_ts;
 /* Values for the PG_DELAY and TX_POWER registers reflect the bandwidth and power of the spectrum at the current
  * temperature. These values can be calibrated prior to taking reference measurements. See NOTE 5 below. */
 extern dwt_txconfig_t txconfig_options;
+
+// -- Custom Code --
+void resp_msg_set_id(uint8_t *id_field, const uint8_t id);
+// -- End --
 
 void setup() {
   UART_init();
@@ -158,6 +175,9 @@ void loop() {
                     resp_msg_set_ts(&tx_resp_msg[RESP_MSG_POLL_RX_TS_IDX], poll_rx_ts);
                     resp_msg_set_ts(&tx_resp_msg[RESP_MSG_RESP_TX_TS_IDX], resp_tx_ts);
 
+                    // -- Custom Code --
+                    resp_msg_set_id(&tx_resp_msg[RESP_MSG_RESP_ID_IDX], DEVICE_ID);
+                    // -- End --
                     /* Write and send the response message. See NOTE 9 below. */
                     tx_resp_msg[ALL_MSG_SN_IDX] = frame_seq_nb;
                     dwt_writetxdata(sizeof(tx_resp_msg), tx_resp_msg, 0); /* Zero offset in TX buffer. */
@@ -186,6 +206,12 @@ void loop() {
             dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_ALL_RX_ERR);
         }
 }
+
+// -- Custom Code --
+void resp_msg_set_id(uint8_t *id_field, const uint8_t id) {
+    *id_field = id;
+}
+// -- End --
 
 /*****************************************************************************************************************************************************
  * NOTES:

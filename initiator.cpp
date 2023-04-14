@@ -33,20 +33,33 @@ static dwt_config_t config = {
 
 /* Frames used in the ranging process. See NOTE 3 below. */
 static uint8_t tx_poll_msg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0xE0, 0, 0};
-static uint8_t rx_resp_msg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'V', 'E', 'W', 'A', 0xE1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+
+// -- Custom Code --
+// Added: 1 Byte
+static uint8_t rx_resp_msg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'V', 'E', 'W', 'A', 0xE1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+// -- End --
+
 /* Length of the common part of the message (up to and including the function code, see NOTE 3 below). */
 #define ALL_MSG_COMMON_LEN 10
 /* Indexes to access some of the fields in the frames defined above. */
 #define ALL_MSG_SN_IDX 2
 #define RESP_MSG_POLL_RX_TS_IDX 10
 #define RESP_MSG_RESP_TX_TS_IDX 14
+
+// -- Custom Code --
+#define RESP_MSG_RESP_ID_IDX 18
+// -- End --
 #define RESP_MSG_TS_LEN 4
 /* Frame sequence number, incremented after each transmission. */
 static uint8_t frame_seq_nb = 0;
 
 /* Buffer to store received response message.
  * Its size is adjusted to longest frame that this example code is supposed to handle. */
-#define RX_BUF_LEN 20
+
+// -- Custom Code --
+// Added: 1 Byte
+#define RX_BUF_LEN 21
+// -- End --
 static uint8_t rx_buffer[RX_BUF_LEN];
 
 /* Hold copy of status register state here for reference so that it can be examined at a debug breakpoint. */
@@ -84,6 +97,10 @@ static double distance;
 /* Values for the PG_DELAY and TX_POWER registers reflect the bandwidth and power of the spectrum at the current
  * temperature. These values can be calibrated prior to taking reference measurements. See NOTE 2 below. */
 extern dwt_txconfig_t txconfig_options;
+
+// -- Custom Code --
+void resp_msg_get_id(uint8_t *id_field, uint8_t *id);
+// -- End --
 
 void setup() {
   UART_init();
@@ -172,6 +189,9 @@ void loop() {
                 if (memcmp(rx_buffer, rx_resp_msg, ALL_MSG_COMMON_LEN) == 0)
                 {
                     uint32_t poll_tx_ts, resp_rx_ts, poll_rx_ts, resp_tx_ts;
+                    // -- Custom Code --
+                    uint8_t resp_id;
+                    // -- End --
                     int32_t rtd_init, rtd_resp;
                     float clockOffsetRatio ;
 
@@ -186,6 +206,10 @@ void loop() {
                     resp_msg_get_ts(&rx_buffer[RESP_MSG_POLL_RX_TS_IDX], &poll_rx_ts);
                     resp_msg_get_ts(&rx_buffer[RESP_MSG_RESP_TX_TS_IDX], &resp_tx_ts);
 
+                    // -- Custom Code --
+                    resp_msg_get_id(&rx_buffer[RESP_MSG_RESP_ID_IDX], &resp_id);
+                    // -- End --
+
                     /* Compute time of flight and distance, using clock offset ratio to correct for differing local and remote clock rates */
                     rtd_init = resp_rx_ts - poll_tx_ts;
                     rtd_resp = resp_tx_ts - poll_rx_ts;
@@ -194,7 +218,9 @@ void loop() {
                     distance = tof * SPEED_OF_LIGHT;
 
                     /* Display computed distance on LCD. */
-                    snprintf(dist_str, sizeof(dist_str), "DIST: %3.2f m", distance);
+                    // -- Custom Code --
+                    snprintf(dist_str, sizeof(dist_str), "DIST: %3.2fm,%d", distance, resp_id);
+                    // -- End --
                     test_run_info((unsigned char *)dist_str);
                 }
             }
@@ -209,6 +235,13 @@ void loop() {
         Sleep(RNG_DELAY_MS);
 }
 
+// -- Custom Code --
+// Gets the id: All it does it copies what id_field stores into id
+// It is only made into a function for more verbosity
+void resp_msg_get_id(uint8_t *id_field, uint8_t *id) {
+    *id = *id_field;
+}
+// -- End --
 /*****************************************************************************************************************************************************
  * NOTES:
  *
